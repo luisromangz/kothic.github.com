@@ -391,6 +391,16 @@ Kothic.path = (function () {
         return p[0] === 0 || p[0] === size || p[1] === 0 || p[1] === size;
     }
 
+    function calculateNormal(p0, p1) {
+	var ry = p1[1]-p0[1];
+	var rx = p1[0]-p0[0];
+	
+	var d = Math.sqrt(rx*rx+ry*ry);
+	
+	return [-ry/d,rx/d];
+
+	}
+
     return function (ctx, feature, dashes, fill, ws, hs, granularity) {
         var type = feature.type,
             coords = feature.coordinates;
@@ -423,7 +433,7 @@ Kothic.path = (function () {
                         point = points[j] || points[0];
                         screenPoint = Kothic.geom.transformPoint(point, ws, hs);
 
-                        if (j === 0 || (!fill &&
+			if (j === 0 || (!fill &&
                                 isTileBoundary(point, granularity) &&
                                 isTileBoundary(prevPoint, granularity))) {
                             moveTo(ctx, screenPoint, dashes);
@@ -438,6 +448,11 @@ Kothic.path = (function () {
             }
         }
 
+
+	var offset = 5;
+
+
+	var nextpoint, prevPoint;
         if (type === "MultiLineString") {
             for (i = 0; i < len; i++) {
                 points = coords[i];
@@ -445,7 +460,8 @@ Kothic.path = (function () {
 
                 for (j = 0; j < pointsLen; j++) {
                     point = points[j];
-                    screenPoint = Kothic.geom.transformPoint(point, ws, hs);
+			screenPoint = Kothic.geom.transformPoint(point, ws, hs);			
+
 
                     // continue path off the tile by some abount to fix path edges between tiles
                     if ((j === 0 || j === pointsLen - 1) && isTileBoundary(point, granularity)) {
@@ -458,6 +474,48 @@ Kothic.path = (function () {
                         screenPoint[0] = screenPoint[0] + pad * dx / dist;
                         screenPoint[1] = screenPoint[1] + pad * dy / dist;
                     }
+
+		    // Offset 
+			if(offset>0) {
+                    if(j == 0) {
+			nextPoint = Kothic.geom.transformPoint(points[j+1], ws, hs);
+			normal = calculateNormal(screenPoint,nextPoint);
+			screenPoint[0] = screenPoint[0]	+ offset * normal[0];
+			screenPoint[1] = screenPoint[1] + offset * normal[1];
+		    } else if(j==pointsLen-1) {
+			prevPoint = Kothic.geom.transformPoint(points[j-1], ws, hs);
+			normal = calculateNormal(prevPoint,screenPoint);
+			screenPoint[0] = screenPoint[0]	+ offset * normal[0];
+			screenPoint[1] = screenPoint[1] + offset * normal[1];
+		    } else {
+
+			prevPoint = Kothic.geom.transformPoint(points[j-1], ws, hs);
+			normal0 = calculateNormal(prevPoint,screenPoint);
+
+			var x1 = prevPoint[0]	+ offset * normal0[0];
+			var y1 = prevPoint[1] + offset * normal0[1];
+
+			var x2 = screenPoint[0]	+ offset * normal0[0];
+			var y2 = screenPoint[1] + offset * normal0[1];
+
+			nextPoint = Kothic.geom.transformPoint(points[j+1], ws, hs);
+			normal1 = calculateNormal(screenPoint,nextPoint);
+			var x3 = screenPoint[0]	+ offset * normal1[0];
+			var y3 = screenPoint[1] + offset * normal1[1];
+
+			var x4 = nextPoint[0]	+ offset * normal1[0];
+			var y4 = nextPoint[1] + offset * normal1[1];
+
+			
+			var d = (x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
+
+			var n1 = (x1*y2 - y1*x2);
+			var n2= (x3*y4-y3*x4);
+
+			screenPoint[0] = (n1*(x3-x4)-(x1-x2)*n2)/d;
+			screenPoint[1] = (n1*(y3-y4)-(y1-y2)*n2)/d;			
+		    }
+			}
 
                     if (j === 0) {
                         moveTo(ctx, screenPoint, dashes);
