@@ -509,7 +509,7 @@ Kothic.path = (function() {
                     }
 
                     // Offset 
-                    if (offset > 0) {
+                    if (offset !== 0) {
                         if (j === 0) {
                             nextPoint = Kothic.geom.transformPoint(points[j + 1], ws, hs);
                             normal = calculateNormal(screenPoint, nextPoint);
